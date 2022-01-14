@@ -1,0 +1,6 @@
+version: '3'
+services:
+  peppercord:
+    image: ghcr.io/regulad/docker-discord-template:latest  # TODO: replace this with your package name
+    environment:
+      - TOKEN=YOUR_TOKEN
