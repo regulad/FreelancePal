@@ -1,6 +1,9 @@
 version: '3'
 services:
   peppercord:
-    image: ghcr.io/regulad/docker-discord-template:latest  # TODO: replace this with your package name
+    image: ghcr.io/regulad/freelance-pal:latest  # TODO: replace this with your package name
     environment:
-      - TOKEN=YOUR_TOKEN
+      - DISCORD_TOKEN=YOUR_TOKEN
+      - PAYPAL_SECRET=secret
+      - PAYPAL_CLIENT_ID=1
+#      - LOGGING_WEBHOOK=https://discord.com/api/webhooks/931714587181609031/xxxxxx
