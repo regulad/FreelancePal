@@ -1,2 +1,2 @@
-discord.py[voice]@git+https://github.com/iDevision/enhanced-discord.py
+discord.py@git+https://github.com/iDevision/enhanced-discord.py
 discord-webhook-logger
