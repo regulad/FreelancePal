@@ -1,6 +1,6 @@
 version: '3'
 services:
-  peppercord:
+  freelancepal:
     image: ghcr.io/regulad/freelance-pal:latest  # TODO: replace this with your package name
     environment:
       - DISCORD_TOKEN=YOUR_TOKEN
