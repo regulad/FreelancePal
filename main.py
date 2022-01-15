@@ -15,23 +15,10 @@ import discord
 import dislog
 from discord.ext import commands
 
-guild_id: int = 730908012851757078
-role_id: int = 931684330554675251
-paypal_url: str = "https://api-m.paypal.com" if os.environ.get("DEBUG") is None else "https://api-m.sandbox.paypal.com"
 remove_zero_padding_string: str = "#" if os.name == 'nt' else "-"
 
-bot: commands.Bot = commands.Bot(
-    max_messages=None,  # Slim this bitch RIGHT down!
-    command_prefix=".",  # We don't use this.
-    description=None,
-    intents=discord.Intents(guilds=True),
-    slash_command_guilds=[guild_id],
-    message_commands=False,
-    slash_commands=True,
-    help_command=None,
-    activity=discord.Game("Serious business.")
-)
 
+# Why is this different per-os? Seems like an overseight
 
 class TimeCog(commands.Cog):
     """A set of tools for working with time."""
@@ -50,12 +37,17 @@ class TimeCog(commands.Cog):
 class PayPalCog(commands.Cog):
     """A set of tools for working with PayPal invoices."""
 
-    def __init__(self):
+    def __init__(self, paypal_client_id: str, paypal_secret: str, required_role: int, paypal_url: str) -> None:
         self._paypal_client: Optional[aiohttp.ClientSession] = None
         self._token_client: Optional[aiohttp.ClientSession] = None
         self._token_type: Optional[str] = None
         self._token: Optional[str] = None
         self._expiry: Optional[datetime.datetime] = None
+
+        self._paypal_client_id: str = paypal_client_id
+        self._paypal_secret: str = paypal_secret
+        self._required_role: int = required_role
+        self._paypal_url: str = paypal_url
 
     async def refresh_token(self) -> None:
         if self._token_client is None:
@@ -64,9 +56,9 @@ class PayPalCog(commands.Cog):
                     "Accept": "application/json",
                     "Accept-Language": "en_US",
                 },
-                auth=aiohttp.BasicAuth(os.environ["PAYPAL_CLIENT_ID"], os.environ["PAYPAL_SECRET"])
+                auth=aiohttp.BasicAuth(self._paypal_client_id, self._paypal_secret)
             )
-        async with self._token_client.post(f"{paypal_url}/v1/oauth2/token",
+        async with self._token_client.post(f"{self._paypal_url}/v1/oauth2/token",
                                            data="grant_type=client_credentials") as request:
             return_json: dict = await request.json()
             self._expiry = datetime.datetime.utcnow() + datetime.timedelta(seconds=return_json["expires_in"])
@@ -74,7 +66,7 @@ class PayPalCog(commands.Cog):
             self._token = return_json["access_token"]
 
     async def cog_check(self, ctx: commands.Context) -> bool:
-        role: discord.Role = ctx.guild.get_role(role_id)
+        role: discord.Role = ctx.guild.get_role(self._required_role)
 
         permissible: bool = role in ctx.author.roles
 
@@ -85,9 +77,9 @@ class PayPalCog(commands.Cog):
 
     def cog_unload(self) -> None:
         if self._token_client is not None:
-            asyncio.run(self._token_client.close())
+            asyncio.run_coroutine_threadsafe(self._token_client.close())
         if self._paypal_client is not None:
-            asyncio.run(self._paypal_client.close())
+            asyncio.run_coroutine_threadsafe(self._paypal_client.close())
 
     async def cog_before_invoke(self, ctx: commands.Context) -> None:
         if self._expiry is None or datetime.datetime.utcnow() > self._expiry:
@@ -107,15 +99,47 @@ class PayPalCog(commands.Cog):
 
 
 if __name__ == "__main__":
+    debug: bool = os.environ.get("DEBUG") is not None
+
+    # Setup logging
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s:%(levelname)s:%(name)s: %(message)s"
+        level=logging.DEBUG if debug else logging.INFO, format="%(asctime)s:%(levelname)s:%(name)s: %(message)s"
     )
 
     if os.environ.get("LOGGING_WEBHOOK") is not None:
         logging.root.addHandler(dislog.DiscordWebhookHandler(os.environ.get("LOGGING_WEBHOOK")))
 
-    bot.add_cog(TimeCog())
-    if os.environ.get("PAYPAL_SECRET") is not None and os.environ.get("PAYPAL_CLIENT_ID") is not None:
-        bot.add_cog(PayPalCog())
+    # Initialize everything
+
+    role_id: int = int(os.environ["FREELANCE_ROLE"])
+    guild_id: int = int(os.environ["MAIN_GUILD"])
+
+    bot: commands.Bot = commands.Bot(
+        max_messages=None,  # Slim this bitch RIGHT down! We are never using messages.
+        command_prefix=".",  # We don't use this.
+        description=None,
+        intents=discord.Intents(guilds=True),
+        slash_command_guilds=[guild_id] if debug else None,
+        message_commands=False,
+        slash_commands=True,
+        help_command=None,
+        activity=discord.Game("Serious business.")
+    )
+
+    bot.add_cog(TimeCog())  # No prereq's for this
+
+    maybe_paypal_secret: Optional[str] = os.environ.get("PAYPAL_SECRET")
+    maybe_paypal_client_id: Optional[str] = os.environ.get("PAYPAL_CLIENT_ID")
+
+    if maybe_paypal_secret is not None and maybe_paypal_client_id is not None:
+        bot.add_cog(
+            PayPalCog(
+                maybe_paypal_client_id,
+                maybe_paypal_secret,
+                role_id,
+                "https://api-m.paypal.com" if not debug else "https://api-m.sandbox.paypal.com"),
+        )
+
+    # Get running!
 
     bot.run(os.environ["DISCORD_TOKEN"])

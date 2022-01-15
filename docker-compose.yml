@@ -1,9 +1,11 @@
 version: '3'
 services:
   freelancepal:
-    image: ghcr.io/regulad/freelance-pal:latest  # TODO: replace this with your package name
+    image: ghcr.io/regulad/freelance-pal:latest
     environment:
       - DISCORD_TOKEN=YOUR_TOKEN
-      - PAYPAL_SECRET=secret
+      - FREELANCE_ROLE=01001110101010100
+      - MAIN_GUILD=
+      - PAYPAL_SECRET=secret  # PayPal Secret and PayPal Client ID can be removed if you do not want to use PayPal functionality.
       - PAYPAL_CLIENT_ID=1
-#      - LOGGING_WEBHOOK=https://discord.com/api/webhooks/931714587181609031/xxxxxx
+      - LOGGING_WEBHOOK=https://discord.com/api/webhooks/931714587181609031/xxxxxx  # You can replace this with a discord webhook to have log messages sent over discord, or you can remove it to remove this functionality enturely.
