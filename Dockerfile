@@ -2,6 +2,8 @@
 
 FROM python:3.10.1-alpine
 
+RUN apk add git
+
 WORKDIR /app
 
 COPY requirements.txt requirements.txt
