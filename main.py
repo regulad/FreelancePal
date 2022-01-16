@@ -23,6 +23,9 @@ remove_zero_padding_string: str = "#" if os.name == 'nt' else "-"
 class TimeCog(commands.Cog):
     """A set of tools for working with time."""
 
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot: commands.Bot = bot
+
     @commands.command()
     async def timestamp(self, ctx: commands.Context) -> None:
         """Sends the current time as a Discord timestamp, and as plain text."""
@@ -37,7 +40,16 @@ class TimeCog(commands.Cog):
 class PayPalCog(commands.Cog):
     """A set of tools for working with PayPal invoices."""
 
-    def __init__(self, paypal_client_id: str, paypal_secret: str, required_role: int, paypal_url: str) -> None:
+    def __init__(
+            self,
+            bot: commands.Bot,
+            paypal_client_id: str,
+            paypal_secret: str,
+            required_role: int,
+            paypal_url: str
+    ) -> None:
+        self.bot: commands.Bot = bot
+
         self._paypal_client: Optional[aiohttp.ClientSession] = None
         self._token_client: Optional[aiohttp.ClientSession] = None
         self._token_type: Optional[str] = None
@@ -77,9 +89,9 @@ class PayPalCog(commands.Cog):
 
     def cog_unload(self) -> None:
         if self._token_client is not None:
-            asyncio.run_coroutine_threadsafe(self._token_client.close())
+            self.bot.loop.run_until_complete(self._token_client.close())
         if self._paypal_client is not None:
-            asyncio.run_coroutine_threadsafe(self._paypal_client.close())
+            self.bot.loop.run_until_complete(self._paypal_client.close())
 
     async def cog_before_invoke(self, ctx: commands.Context) -> None:
         if self._expiry is None or datetime.datetime.utcnow() > self._expiry:
@@ -114,6 +126,8 @@ if __name__ == "__main__":
     role_id: int = int(os.environ["FREELANCE_ROLE"])
     guild_id: int = int(os.environ["MAIN_GUILD"])
 
+    loop: asyncio.AbstractEventLoop = asyncio.get_event_loop_policy().new_event_loop()
+
     bot: commands.Bot = commands.Bot(
         max_messages=None,  # Slim this bitch RIGHT down! We are never using messages.
         command_prefix=".",  # We don't use this.
@@ -123,10 +137,11 @@ if __name__ == "__main__":
         message_commands=False,
         slash_commands=True,
         help_command=None,
+        loop=loop,
         activity=discord.Game("Serious business.")
     )
 
-    bot.add_cog(TimeCog())  # No prereq's for this
+    bot.add_cog(TimeCog(bot))  # No prereq's for this
 
     maybe_paypal_secret: Optional[str] = os.environ.get("PAYPAL_SECRET")
     maybe_paypal_client_id: Optional[str] = os.environ.get("PAYPAL_CLIENT_ID")
@@ -134,10 +149,12 @@ if __name__ == "__main__":
     if maybe_paypal_secret is not None and maybe_paypal_client_id is not None:
         bot.add_cog(
             PayPalCog(
+                bot,
                 maybe_paypal_client_id,
                 maybe_paypal_secret,
                 role_id,
-                "https://api-m.paypal.com" if not debug else "https://api-m.sandbox.paypal.com"),
+                "https://api-m.paypal.com" if not debug else "https://api-m.sandbox.paypal.com"
+            ),
         )
 
     # Get running!
